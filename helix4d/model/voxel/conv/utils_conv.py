@@ -5,7 +5,7 @@ class ConvLayer(nn.Module):
 
     def __init__(self, dim_in, dim_out, key=None, *args, **kwargs):
         super(ConvLayer, self).__init__()
-        self.conv3x3x3 = conv3x3x3(dim_in, dim_out, indice_key=key+"_3x3x3")
+        self.conv3x3x3 = conv3x3x3(dim_in, dim_out, indice_key=f"{key}_3x3x3")
         self.act = nn.LeakyReLU()
         self.bn = nn.BatchNorm1d(dim_out)
 
@@ -18,19 +18,19 @@ class AsymConvLayer(nn.Module):
     def __init__(self, dim_in, dim_out, key=None, *args, **kwargs):
         super(AsymConvLayer, self).__init__()
 
-        self.conv_A0 = conv1x3x3(dim_in, dim_out, indice_key=key+"_1x3x3")
+        self.conv_A0 = conv1x3x3(dim_in, dim_out, indice_key=f"{key}_1x3x3")
         self.bn_A0 = nn.BatchNorm1d(dim_out)
         self.act_A0 = nn.LeakyReLU()
 
-        self.conv_A1 = conv3x1x3(dim_out, dim_out, indice_key=key+"_3x1x3")
+        self.conv_A1 = conv3x1x3(dim_out, dim_out, indice_key=f"{key}_3x1x3")
         self.bn_A1 = nn.BatchNorm1d(dim_out)
         self.act_A1 = nn.LeakyReLU()
 
-        self.conv_B0 = conv3x1x3(dim_in, dim_out, indice_key=key+"_3x1x3")
+        self.conv_B0 = conv3x1x3(dim_in, dim_out, indice_key=f"{key}_3x1x3")
         self.bn_B0 = nn.BatchNorm1d(dim_out)
         self.act_B0 = nn.LeakyReLU()
 
-        self.conv_B1 = conv1x3x3(dim_out, dim_out, indice_key=key+"_1x3x3")
+        self.conv_B1 = conv1x3x3(dim_out, dim_out, indice_key=f"{key}_1x3x3")
         self.bn_B1 = nn.BatchNorm1d(dim_out)
         self.act_B1 = nn.LeakyReLU()
 

@@ -8,8 +8,7 @@ class MySequential(nn.Sequential):
             return super().forward(features), None, None, None, None, None
 
 def Linear(dim_in, transformer, *args, **kwargs):
-    layers = []
-    layers.append(nn.BatchNorm1d(dim_in))
+    layers = [nn.BatchNorm1d(dim_in)]
     layers.append(nn.ReLU())
 
     for _ in range(transformer.n_layers):

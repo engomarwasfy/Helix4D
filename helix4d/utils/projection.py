@@ -10,28 +10,28 @@ PROJ_UP_H=256
 PROJ_FOV_XY=35.
 
 def do_focus_projection(points, focus_id=None, proj_fov_xy=PROJ_FOV_XY, proj_up_h=PROJ_UP_H):
-    if focus_id is not None:
-        P = points[focus_id]
-        c, s = -P[1] / torch.norm(P[:2]), P[0] / torch.norm(P[:2])
-        mat = torch.tensor([[c, s, 0], [-s, c, 0], [0, 0, 1]])
-        x = points.matmul(mat.T)
+    if focus_id is None:
+        return do_up_projection(points, proj_fov_xy=proj_fov_xy, proj_up_h=proj_up_h)
+    P = points[focus_id]
+    c, s = -P[1] / torch.norm(P[:2]), P[0] / torch.norm(P[:2])
+    mat = torch.tensor([[c, s, 0], [-s, c, 0], [0, 0, 1]])
+    x = points.matmul(mat.T)
 
-        x[:, 2] = x[:, 2] - x[focus_id][2]
+    x[:, 2] = x[:, 2] - x[focus_id][2]
 
-        P = x[focus_id]
-        Hz = 3
-        norm_camera = (Hz**2+P[1]**2)**.5
-        c, s = Hz / norm_camera, P[1] / norm_camera
-        mat = torch.tensor([[1, 0, 0], [0, c, s], [0, -s, c]])
-        x = x.matmul(mat.T)
-        
-        zoom = torch.norm(P[:2]) / torch.norm(x[focus_id][:2])
-        x = x - x[focus_id]
+    P = x[focus_id]
+    Hz = 3
+    norm_camera = (Hz**2+P[1]**2)**.5
+    c, s = Hz / norm_camera, P[1] / norm_camera
+    mat = torch.tensor([[1, 0, 0], [0, c, s], [0, -s, c]])
+    x = x.matmul(mat.T)
 
-        #x[x[:, 2] > Hz] *= 0
-        x *= 4*zoom**.5
-        return do_up_projection(x, proj_fov_xy=proj_fov_xy, proj_up_h=proj_up_h)
-    return do_up_projection(points, proj_fov_xy=proj_fov_xy, proj_up_h=proj_up_h)
+    zoom = torch.norm(P[:2]) / torch.norm(x[focus_id][:2])
+    x = x - x[focus_id]
+
+    #x[x[:, 2] > Hz] *= 0
+    x *= 4*zoom**.5
+    return do_up_projection(x, proj_fov_xy=proj_fov_xy, proj_up_h=proj_up_h)
 
 
 def do_up_projection(points, proj_fov_xy=PROJ_FOV_XY, proj_up_h=PROJ_UP_H):
@@ -84,11 +84,11 @@ def do_range_projection(points):
     #    2,
     #    axis=1
     #)
-    
+
     points_cleaned = points[depth > 10e-8]
     depth = depth[depth > 10e-8]
-    
-    
+
+
     # get scan components
     scan_x = points_cleaned[:, 0]
     scan_y = points_cleaned[:, 1]
@@ -114,10 +114,10 @@ def do_range_projection(points):
     indices = np.arange(depth.shape[0])
     order = np.argsort(depth.numpy())[::-1]
     indices = indices[order]
-    
+
     proj_y = proj_y[order]
     proj_x = proj_x[order]
-    
+
     proj_idx = np.full((proj_H, proj_W),
                        -1,
                        dtype=np.int32)

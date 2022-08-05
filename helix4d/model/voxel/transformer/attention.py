@@ -35,7 +35,7 @@ class Attention(torch.jit.ScriptModule):
         else:
             self.register_buffer("temperature_nowd",
                                  1/(self.d_qk**.5)*torch.ones(self.h))
-        
+
         self.samequerykey = transformer.samequerykey
         self.maxi_d = self.d + (2 - self.samequerykey)*self.d_qk
 
@@ -61,7 +61,7 @@ class Attention(torch.jit.ScriptModule):
                 torch.zeros((n_buckets, self.h, self.d_qk)))
 
             self.compute_relative_posenc = compute_relative_posenc_mul
-            
+
         elif self.relative_positional_mode == "plus":
             n_buckets = list(2*np.array(transformer.relative_positional_beta)+1)
 
@@ -73,23 +73,21 @@ class Attention(torch.jit.ScriptModule):
             self.compute_relative_posenc = compute_relative_posenc_plus
         else:
             raise ValueError
-                
+
         self.apply(_init_weights)
 
     @torch.jit.script_method
     def forward(self, x, iq, ik, buckets, keystouse, valuestouse):
         with torch.profiler.record_function("ATT"):
-            
+
             query_key_value = self.qkv_linear(x).view(-1, self.h, self.maxi_d)
 
             if self.samequerykey:
                 query = key = query_key_value[..., :self.d_qk]
-                value = query_key_value[..., -self.d:]
             else:
                 query = query_key_value[..., :self.d_qk]
                 key = query_key_value[..., self.d_qk:2*self.d_qk]
-                value = query_key_value[..., -self.d:]
-
+            value = query_key_value[..., -self.d:]
             proba, key = self.compute_proba(
                 query, key, iq, ik, buckets, keystouse=keystouse)
 

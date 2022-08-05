@@ -10,7 +10,7 @@ def get_trainer(cfg):
     logger = pl.loggers.TensorBoardLogger(".", "", "", log_graph=False, default_hp_metric=False)
 
     callbacks = [hydra.utils.instantiate(callback) for callback in cfg.model.callbacks.values()]
-    
+
     if cfg.profile:
         profiler = pl.profiler.PyTorchProfiler(
             with_stack=True,
@@ -26,7 +26,7 @@ def get_trainer(cfg):
         **OmegaConf.to_container(cfg.trainer),
         logger=logger,
         callbacks=callbacks,
-        limit_train_batches=1. if not cfg.data.DEBUG else 0.025,
+        limit_train_batches=0.025 if cfg.data.DEBUG else 1.0,
         num_sanity_val_steps=0,
         profiler=profiler
     )

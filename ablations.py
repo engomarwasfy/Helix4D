@@ -9,7 +9,7 @@ parser.add_argument("--batch_size", default=2, type=int)
 args = parser.parse_args()
 
 def overide_config(base, dico):
-    return base + " ".join([f"{k}=" + str(v) for k, v in dico.items()]) + " "
+    return base + " ".join([f"{k}={str(v)}" for k, v in dico.items()]) + " "
 
 default_config =  {
     "model.data.num_workers": min(4*args.n_gpus, 16),
@@ -38,21 +38,36 @@ set -x # activer l’echo des commandes
 
 srun python main.py """, default_config)
 
-models = sum([[[
-    {
-        "+data": "semantic-kitti",
-        "+experiment": xp,
-        "data.blocks_per_rotation": blocks_per_rotation,
-        "hydra.run.dir": f"outputs/{xp}/ABLATION_B{blocks_per_rotation}"
-    }
-] for xp in ["ours", "ours_noposenc", "ours_C3D", "ours_KdiffQ", "ours_nopast", "ours_notrans", "ours_tiny"]
-] for blocks_per_rotation in [5, 1]
-], [])
-    
+models = sum(
+    (
+        [
+            [
+                {
+                    "+data": "semantic-kitti",
+                    "+experiment": xp,
+                    "data.blocks_per_rotation": blocks_per_rotation,
+                    "hydra.run.dir": f"outputs/{xp}/ABLATION_B{blocks_per_rotation}",
+                }
+            ]
+            for xp in [
+                "ours",
+                "ours_noposenc",
+                "ours_C3D",
+                "ours_KdiffQ",
+                "ours_nopast",
+                "ours_notrans",
+                "ours_tiny",
+            ]
+        ]
+        for blocks_per_rotation in [5, 1]
+    ),
+    [],
+)
+
+
 print(f"##### Launching {len(models)} jobs #####")
-for i, model in enumerate(models):    
-    f = open("auto.slurm", "w")
-    f.write(overide_config(slurm, model))
-    f.close()
+for model in models:
+    with open("auto.slurm", "w") as f:
+        f.write(overide_config(slurm, model))
     os.system(f"sbatch -C v100-{args.gpu_mem}g auto.slurm")
     os.remove("auto.slurm")

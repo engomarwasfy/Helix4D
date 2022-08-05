@@ -12,7 +12,7 @@ class LovaszLoss(torch.jit.ScriptModule):
     @torch.jit.script_method
     def forward(self, logits: torch.Tensor, labels: torch.Tensor):
         probas = F.softmax(logits, dim=-1)
-        
+
         valid = labels != self.ignore_index
 
         vprobas = probas[valid]
@@ -35,7 +35,7 @@ class LovaszLoss(torch.jit.ScriptModule):
         all_perm = all_perm.data
 
         all_fg_sorted = torch.gather(all_fg, 0, all_perm)
-        
+
         all_intersection = all_gts - all_fg_sorted.cumsum(0)
         all_union = all_gts + (1. - all_fg_sorted).cumsum(0)
 
