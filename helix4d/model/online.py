@@ -13,7 +13,7 @@ class OnlineModel:
         from_avail_scan_sequence_to_scan_bucket = torch.zeros((1+np.max(np.abs(self.hparams.data.temporal_scan_sequence)))) if len(self.hparams.data.temporal_scan_sequence) != 0 else torch.zeros(1)
         for iass, ass in enumerate(avail_scan_sequence):
             from_avail_scan_sequence_to_scan_bucket[-ass] = iass
-            
+
         seqid, scanid = batch.seqid.item(), batch.scanid.item()
 
         if self.current_seqid is None:
@@ -35,7 +35,7 @@ class OnlineModel:
             pose = None
             invpose = None
         del batch.ptr
-        
+
         loss, point_crossentropy, point_lovasz = [], [], []
         point_pred = torch.zeros((batch.backprop.sum().item(), ), dtype=torch.uint8, device=self.device)
 
@@ -46,7 +46,7 @@ class OnlineModel:
             #tqdm.write(f"slice {scanid}, {slice}")
 
             floatscanid = scanid + (self.hparams.data.slices_per_rotation - slice) / self.hparams.data.slices_per_rotation
-            
+
             get_slice_time, is_slice_y, slice_idx, data_slice = self.get_slice(batch, batch_idx, slice)
             if data_slice.features.size(0) != 0:
                 kvp_in = self.get_past_kvp(avail_scan_sequence, from_avail_scan_sequence_to_scan_bucket, floatscanid, invpose)
@@ -54,7 +54,7 @@ class OnlineModel:
                 acq_time = self.compute_acquisition_time(data_slice, tag)
 
                 global_time = time.time()
-                with torch.profiler.record_function(f"GLOBAL STEP"):
+                with torch.profiler.record_function("GLOBAL STEP"):
                     slice_out = self.global_step(
                         data_slice, slice_idx, tag,
                         kvp_in=kvp_in
@@ -76,18 +76,17 @@ class OnlineModel:
 
         self.clean_kvp(avail_scan_sequence)
 
-        out = {
+        return {
             "loss": torch.tensor(loss).mean(),
             "point_crossentropy": torch.tensor(point_crossentropy).mean(),
             "point_lovasz": torch.tensor(point_lovasz).mean(),
             "point_pred": point_pred.detach(),
-            "batch_size": 1
+            "batch_size": 1,
         }
-        return out
 
     def get_slice(self, batch, batch_idx, slice):
         get_slice_time = time.time()
-        with torch.profiler.record_function(f"GET slice"):
+        with torch.profiler.record_function("GET slice"):
             is_slice = batch.voxelind[:, 0]==slice
             is_slice_y = is_slice[batch.backprop]
             slice_idx = batch_idx * self.hparams.data.slices_per_rotation + (self.hparams.data.slices_per_rotation - slice - 1)
@@ -134,7 +133,7 @@ class OnlineModel:
 
     def save_past_kvp(self, scanid, kvp_out, pose):
         #tqdm.write(f"out scan\t{scanid:.2f}")
-        with torch.profiler.record_function(f"PAST K/V/P OUT"):
+        with torch.profiler.record_function("PAST K/V/P OUT"):
             if kvp_out is not None:
                 kvp_out = Data(**kvp_out)
                 kvp_out.pos = torch.cat([
@@ -145,7 +144,7 @@ class OnlineModel:
                 self.kvp_kept.append(kvp_out)
 
     def get_past_kvp(self, avail_scan_sequence, from_avail_scan_sequence_to_scan_bucket, scanid, invpose):
-        with torch.profiler.record_function(f"PAST K/V/P IN"):
+        with torch.profiler.record_function("PAST K/V/P IN"):
             if self.hparams.data.temporal_transformer:
                 kvp_in = None
                 if len(self.kvp_kept) != 0:

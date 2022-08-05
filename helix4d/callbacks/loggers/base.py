@@ -32,8 +32,7 @@ class BaseLogger(Callback):
         for do_projection, view, h, w in zip([do_up_projection], ["top_view"], [PROJ_UP_H], [PROJ_UP_H]):
             images = []
 
-            do_assignments = ("assignments" in kwargs.keys()) and (
-                kwargs["assignments"] is not None)
+            do_assignments = "assignments" in kwargs and kwargs["assignments"] is not None
             assignments = []
 
             backprop = batch.backprop.detach().cpu()
@@ -44,7 +43,7 @@ class BaseLogger(Callback):
             #point_y = batch.point_y.detach().cpu()[backprop]
             point_y = batch.point_y.detach().cpu()
             ibatch = batch.batch.detach().cpu()[backprop]
-            
+
             for i in range(ibatch.max() + 1):
                 equal = ibatch == i
                 pos[equal] = pos[equal]-pos[equal].mean(0)
@@ -56,7 +55,7 @@ class BaseLogger(Callback):
                 pred = prediction[equal][projection]
                 c = 300 + (70 - 300) * (true == pred)
                 c[true == 0] = 0
-                
+
                 true = self.from_labels_to_color(true) / 255.
                 pred = self.from_labels_to_color(pred.long()) / 255.
                 c = self.from_labels_to_color(c) / 255.
@@ -67,7 +66,10 @@ class BaseLogger(Callback):
 
                 if do_assignments:
                     point2voxel = kwargs["assignments"]
-                    if ("assignments_maps" in kwargs.keys()) and (kwargs["assignments_maps"] is not None):
+                    if (
+                        "assignments_maps" in kwargs
+                        and kwargs["assignments_maps"] is not None
+                    ):
                         for map in kwargs["assignments_maps"]:
                             point2voxel = map[point2voxel]
                     superpoints = point2voxel[backprop][equal][projection]
@@ -137,8 +139,14 @@ class BaseLogger(Callback):
         for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
             if j != cm.shape[0]:
                 color = "white" if cm[i, j] > threshold else "black"
-                cmfloat = np.around(
-                    100 * cm[i, j], decimals=1 if 100 * cm[i, j] >= 10 else 2) if cm[i, j] != 0 else ""
+                cmfloat = (
+                    np.around(
+                        100 * cm[i, j], decimals=1 if cm[i, j] >= 10 / 100 else 2
+                    )
+                    if cm[i, j] != 0
+                    else ""
+                )
+
                 plt.text(j, i, cmfloat, horizontalalignment="center", color=color)
 
         plt.tight_layout()

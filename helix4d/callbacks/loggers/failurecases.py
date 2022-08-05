@@ -18,13 +18,21 @@ class FailureCasesLogger(BaseLogger):
 
     @torch.no_grad()
     def on_validation_batch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", outputs: Optional[STEP_OUTPUT], batch: Any, batch_idx: int, dataloader_idx: int) -> None:
-        if self.do_greedy_step(pl_module.current_epoch):
-            if (torch.abs(self.failure_cases["scanid"] - batch.scanid[0].detach().cpu()).min() > 100) and outputs["loss"] > self.failure_cases["loss"].min():
-                idx = self.failure_cases["loss"].argmin()
-                self.failure_cases["loss"][idx] = outputs["loss"].detach().cpu()
-                self.failure_cases["batch"][idx] = batch.cpu()
-                self.failure_cases["pred"][idx] = outputs["point_pred"].detach().cpu()
-                self.failure_cases["scanid"][idx] = batch.scanid[0].detach().cpu()
+        if (
+            self.do_greedy_step(pl_module.current_epoch)
+            and (
+                torch.abs(
+                    self.failure_cases["scanid"] - batch.scanid[0].detach().cpu()
+                ).min()
+                > 100
+            )
+            and outputs["loss"] > self.failure_cases["loss"].min()
+        ):
+            idx = self.failure_cases["loss"].argmin()
+            self.failure_cases["loss"][idx] = outputs["loss"].detach().cpu()
+            self.failure_cases["batch"][idx] = batch.cpu()
+            self.failure_cases["pred"][idx] = outputs["point_pred"].detach().cpu()
+            self.failure_cases["scanid"][idx] = batch.scanid[0].detach().cpu()
 
     def on_validation_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
         if self.do_greedy_step(pl_module.current_epoch):

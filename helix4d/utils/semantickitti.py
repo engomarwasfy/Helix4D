@@ -24,7 +24,7 @@ def from_inst_to_color(instance):
                                    size=(max_inst_id, 3))
     inst_color[0] = np.full((3), 0.1)
     inst_color = torch.tensor(255*inst_color).int()
-    
+
     color = torch.zeros(list(instance.size())+[3]).int()
     for k in torch.unique(instance.flatten()):
         color[instance == k] = inst_color[k]

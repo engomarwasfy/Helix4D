@@ -9,7 +9,9 @@ from .base import BaseLogger
 class MonitoringLogger(BaseLogger):
 
     def log_step(self, pl_module):
-        pl_module.log(f'step', 1 + pl_module.current_epoch, on_step=False, on_epoch=True)
+        pl_module.log(
+            'step', 1 + pl_module.current_epoch, on_step=False, on_epoch=True
+        )
 
     def greedy_step(self, trainer, pl_module, batch, batch_idx, tag, outputs):
         if batch_idx == 0 and self.do_greedy_step(pl_module.current_epoch):
@@ -51,8 +53,8 @@ class MonitoringLogger(BaseLogger):
 
     @torch.no_grad()
     def log_metrics(self, trainer, pl_module: "pl.LightningModule", tag, batch, batch_idx, outputs):
-        with torch.profiler.record_function(f"LOGGERS"):
-            
+        with torch.profiler.record_function("LOGGERS"):
+
             getattr(pl_module, f'IoU_{tag}').update(outputs["point_pred"], batch.point_y)
 
             pl_module.log(f'Loss_total/{tag}',
@@ -74,7 +76,7 @@ class MonitoringLogger(BaseLogger):
             pl_module.log(f'IoU/{tag}', curr_iou.mean(), on_step=False, on_epoch=True)
 
             if self.do_greedy_step(pl_module.current_epoch):
-                with torch.profiler.record_function(f"CONFMAT"):
+                with torch.profiler.record_function("CONFMAT"):
                     pl_module.logger.experiment.add_image(
                         f"confmat/{tag}", self.image_confusion_matrix(
                             getattr(pl_module, f"IoU_{tag}").confmat.detach().cpu().numpy(), curr_iou),

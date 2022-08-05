@@ -230,30 +230,33 @@ class Helix4D(pl.LightningModule, LoggingModel, OnlineModel):
             encoder=self.hparams.point_encoder
         )
 
-    @torch.profiler.record_function(f"FORWARD")
+    @torch.profiler.record_function("FORWARD")
     def forward(self, batch, batch_size, batch_idx, kvp_in=None):
-        with torch.profiler.record_function(f"VOXELIZE"):
+        with torch.profiler.record_function("VOXELIZE"):
             voxel_ind, point2voxel = compute_point2voxel_map(batch.batch, batch.voxelind)
 
-        with torch.profiler.record_function(f"POINT ENCODER"):
+        with torch.profiler.record_function("POINT ENCODER"):
             point_features = self.point_encoder(batch.features)
-            
-        with torch.profiler.record_function(f"VOXELIZE"):
+
+        with torch.profiler.record_function("VOXELIZE"):
             voxel_features, voxel_pos = voxelize(
                 point_features, batch.pos, point2voxel)
 
-        with torch.profiler.record_function(f"VOXEL ENCODER"):
+        with torch.profiler.record_function("VOXEL ENCODER"):
             voxel_features, kvp_out, maps = self.foward_voxel_encoder(
                 voxel_features, voxel_pos, voxel_ind,
                 batch_size, batch_idx, point2voxel, batch.pos, kvp_in)
 
-        with torch.profiler.record_function(f"UPSAMPLE"):
-            if not hasattr(batch, "backprop"):
-                point_features = upsample(point2voxel, point_features, voxel_features)                    
-            else:
-                point_features = upsample_backprop(batch.backprop, point2voxel, point_features, voxel_features)
+        with torch.profiler.record_function("UPSAMPLE"):
+            point_features = (
+                upsample_backprop(
+                    batch.backprop, point2voxel, point_features, voxel_features
+                )
+                if hasattr(batch, "backprop")
+                else upsample(point2voxel, point_features, voxel_features)
+            )
 
-        with torch.profiler.record_function(f"POINT_DECODER"):
+        with torch.profiler.record_function("POINT_DECODER"):
             point_prediction = self.point_decoder(point_features)
         return point_prediction, point2voxel, maps, kvp_out
 
@@ -280,12 +283,12 @@ class Helix4D(pl.LightningModule, LoggingModel, OnlineModel):
                 spconvtensor = getattr(self, f"H{i}_H{i+1}")(spconvtensor)
                 spconvtensor = spconvtensor.replace_feature(getattr(self, f"H{i}_H{i+1}_norm")(spconvtensor.features))
 
-        with torch.profiler.record_function(f"POS"):
+        with torch.profiler.record_function("POS"):
             voxel_pos, down_spconvindices, slice_indices = retrieve_pos_and_maps(
                 voxel_pos, batch_size, spconvgrid, spconvtensor.indices,
                 self.from_slicegrid_to_sliceindices, self.full_split_hierarchy)
-                  
-        with torch.profiler.record_function(f"XYZT"):
+
+        with torch.profiler.record_function("XYZT"):
             if kvp_in is None:
                 kvp_in = {
                     "pos": self.voxel_transformer.zero_kvp_in_pos,
@@ -320,12 +323,12 @@ class Helix4D(pl.LightningModule, LoggingModel, OnlineModel):
             "Loss_total/train": float("nan"), "Loss/point_crossentropy/train": float("nan"), "IoU/train": float("nan")
         }
         if self.hparams.data.eval_in_online_setup:
-            results[f'Online_time (ms.)/get_slice/val'] = float("nan")
-            results[f'Online_time (ms.)/global_step/val'] = float("nan")
-            results[f'Online_time (ms.)/inference/val'] = float("nan")
-            results[f'Online_time (ms.)/acquisition/val'] = float("nan")
-            results[f'Online_time (ms.)/latency/val'] = float("nan")
-            results[f'Online_time (ms.)/can_idle/val'] = float("nan")
+            results['Online_time (ms.)/get_slice/val'] = float("nan")
+            results['Online_time (ms.)/global_step/val'] = float("nan")
+            results['Online_time (ms.)/inference/val'] = float("nan")
+            results['Online_time (ms.)/acquisition/val'] = float("nan")
+            results['Online_time (ms.)/latency/val'] = float("nan")
+            results['Online_time (ms.)/can_idle/val'] = float("nan")
 
         self.logger.log_hyperparams(self.hparams, results)
 
@@ -342,7 +345,7 @@ class Helix4D(pl.LightningModule, LoggingModel, OnlineModel):
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)     
             start.record()
-            
+
 
         if self.hparams.data.temporal_transformer:
             point_oh_pred, point2voxel, maps, kvp_out = self.forward(
@@ -357,16 +360,16 @@ class Helix4D(pl.LightningModule, LoggingModel, OnlineModel):
             end.record()
             torch.cuda.synchronize()
             inference_time = start.elapsed_time(end) / 1000.
-            
 
-        with torch.profiler.record_function(f"XE"):
+
+        with torch.profiler.record_function("XE"):
             point_crossentropy = self.criterion_crossentropy(
                 point_oh_pred, batch.point_y
             )
-        with torch.profiler.record_function(f"LOVASZ"):
+        with torch.profiler.record_function("LOVASZ"):
             point_lovasz = self.criterion_lovasz(point_oh_pred, batch.point_y)
 
-        out = {
+        return {
             "loss": point_crossentropy + point_lovasz,
             "point_crossentropy": point_crossentropy.detach(),
             "point_lovasz": point_lovasz.detach(),
@@ -375,9 +378,8 @@ class Helix4D(pl.LightningModule, LoggingModel, OnlineModel):
             "kvp_out": kvp_out,
             "point2voxel": point2voxel.detach(),
             "assignments_maps": maps,
-            "batch_size": batch_size
+            "batch_size": batch_size,
         }
-        return out
 
     def training_step(self, batch, batch_idx):
         return self.global_step(batch, batch_idx, 'train')
@@ -425,16 +427,31 @@ class Helix4D(pl.LightningModule, LoggingModel, OnlineModel):
 
         optimizer = getattr(torch.optim, self.hparams.optim._target_)(
             [
-                {'name': f"lr{10*self.hparams.optim.lr}_wd{0}", 'params': nowd_lr10_params,
-                    'weight_decay': 0, 'lr': 10 * self.hparams.optim.lr},
-                {'name': f"lr{self.hparams.optim.lr}_wd{0}",
-                    'params': nowd_params, 'weight_decay': 0},
-                {'name': f"lr{10*self.hparams.optim.lr}_wd{self.hparams.optim.weight_decay}",
-                    'params': lr10_params, 'lr': 10 * self.hparams.optim.lr},
-                {'name': f"lr{self.hparams.optim.lr}_wd{self.hparams.optim.weight_decay}", 'params': base_params}],
+                {
+                    'name': f"lr{10 * self.hparams.optim.lr}_wd0",
+                    'params': nowd_lr10_params,
+                    'weight_decay': 0,
+                    'lr': 10 * self.hparams.optim.lr,
+                },
+                {
+                    'name': f"lr{self.hparams.optim.lr}_wd0",
+                    'params': nowd_params,
+                    'weight_decay': 0,
+                },
+                {
+                    'name': f"lr{10*self.hparams.optim.lr}_wd{self.hparams.optim.weight_decay}",
+                    'params': lr10_params,
+                    'lr': 10 * self.hparams.optim.lr,
+                },
+                {
+                    'name': f"lr{self.hparams.optim.lr}_wd{self.hparams.optim.weight_decay}",
+                    'params': base_params,
+                },
+            ],
             lr=self.hparams.optim.lr,
-            weight_decay=self.hparams.optim.weight_decay
+            weight_decay=self.hparams.optim.weight_decay,
         )
+
 
         return {
             "optimizer": optimizer,

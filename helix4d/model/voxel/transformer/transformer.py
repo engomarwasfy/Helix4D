@@ -68,7 +68,7 @@ def jit_compute_interactions(
 
         # Keep closest points
         if spatial_receptive_field2 != 0:
-            
+
             xy_coarse = torch.ceil(xyz[:, :2] / spatial_receptive_field).to(torch.int8)
             keep_coarse = (torch.index_select(xy_coarse, 0, iqtemp) - torch.index_select(xy_coarse, 0, iktemp)).abs().max(-1)[0] <= 1
             if force_keep_neighbours:
@@ -76,7 +76,7 @@ def jit_compute_interactions(
                 forcekeep = forcekeep[keep_coarse]
 
             iqik = iqik[keep_coarse]
-            
+
             dxyz16 = torch.index_select(xyz16, 0, iqik[:, 0]) - torch.index_select(xyz16, 0, iqik[:, 1])
             keepr = (dxyz16**2).sum(-1) <= spatial_receptive_field2
             if force_keep_neighbours:
@@ -87,7 +87,7 @@ def jit_compute_interactions(
             dxyz16 = dxyz16[keepr]
         else:
             dxyz16 = torch.index_select(xyz16, 0, iqik[:, 0]) - torch.index_select(xyz16, 0, iqik[:, 1])
-            
+
     iq, ik = iqik[:, 0], iqik[:, 1]
 
     if have_kvp:
@@ -96,7 +96,7 @@ def jit_compute_interactions(
     else:
         scanid = torch.div(grid[:, 1], slices_per_rotation, rounding_mode="floor")
         dscanid = scanid[ik] - scanid[iq]
-    
+
     return iq, ik, dxyz16, dscanid
 
 @torch.jit.script
@@ -121,8 +121,7 @@ def from_dxyz_to_bucket_base(x, alpha, beta, gamma, res):
     sup = torch.clamp(torch.round(alpha - (beta - alpha) * torch.log(x_abs / alpha) / torch.log(gamma / alpha)).to(x.dtype), max=beta)
     sup = torch.sign(x) * sup
 
-    buckets = beta + torch.where(x_abs <= alpha, torch.round(x), sup)
-    return buckets
+    return beta + torch.where(x_abs <= alpha, torch.round(x), sup)
 
 @torch.jit.script
 def from_dxyz_to_bucket_mul(x: torch.Tensor, mul_buckets: torch.Tensor, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch.Tensor, res: torch.Tensor):
@@ -149,7 +148,7 @@ class Transformer(torch.jit.ScriptModule):
         self.force_keep_neighbours = transformer.force_keep_neighbours
         self.temporal_transformer = temporal_transformer
         self.slices_per_rotation = slices_per_rotation
-        
+
         self.register_buffer("zero_kvp_in_pos", torch.zeros((0, 4)))
         self.register_buffer("zero_kvp_in_grid", torch.zeros((0, 5), dtype=torch.int32))
 
@@ -281,12 +280,11 @@ class Transformer(torch.jit.ScriptModule):
 
     @torch.jit.script_method
     def prepare_kvpos_out(self, xyz, grid):
-        kvp_out = {}
-        if self.temporal_transformer:
-            #kvp_out = Data(pos=xyz, grid=grid)
-            kvp_out = {"pos": xyz.detach(), "grid": grid.detach()}
-
-        return kvp_out
+        return (
+            {"pos": xyz.detach(), "grid": grid.detach()}
+            if self.temporal_transformer
+            else {}
+        )
 
     @torch.jit.script_method
     def update_kvpos_out(self, kvp_out: Dict[str, torch.Tensor], iblock: int, key: torch.Tensor, value: torch.Tensor):
